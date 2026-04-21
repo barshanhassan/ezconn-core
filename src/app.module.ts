@@ -5,7 +5,6 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { AgencyModule } from './agency/agency.module';
-import { RolesModule } from './roles/roles.module';
 import { TeamsModule } from './teams/teams.module';
 import { ConfigModule } from './config/config.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
@@ -18,7 +17,8 @@ import { InstagramModule } from './instagram/instagram.module';
 import { UserStatesModule } from './user-states/user-states.module';
 import { TtsModule } from './tts/tts.module';
 import { ZapiModule } from './zapi/zapi.module';
-import { WidgetModule } from './widget/widget.module';
+import { WidgetsModule } from './widgets/widgets.module';
+import { IframesModule } from './iframes/iframes.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { CompanyModule } from './company/company.module';
@@ -56,21 +56,72 @@ import { ConversationEventsModule } from './conversation-events/conversation-eve
 import { SupervisorChatStatisticsModule } from './supervisor-chat-statistics/supervisor-chat-statistics.module';
 import { QuickResponseModule } from './quick-response/quick-response.module';
 import { CompaniesModule } from './companies/companies.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
-    AuthModule, UsersModule, WorkspacesModule, AgencyModule, RolesModule, TeamsModule, ConfigModule,
-    WhatsappModule, MessengerModule, TelegramModule, TwilioModule, WabaModule, WebchatModule,
-    InstagramModule, PrismaModule, ContactsModule, CompanyModule, LeadsModule, PipelinesModule,
-    TagsModule, NotesModule, CustomFieldsModule, TasksModule, CalModule, AutomationsModule,
-    BroadcastsModule, NotificationsModule, TriggersModule, BillingModule, StatisticsModule,
-    ChatStatisticsModule, EventLogsModule, ReportsModule, GalleryModule, TextToSpeechModule,
-    BaserowModule, WebhooksModule, MarketplaceModule, DomainsModule, SystemFieldsModule, AiModule,
-    DifyModule, AiThemesModule, AiProductsModule, AiFeedersModule, InboxModule, ConversationEventsModule,
-    SupervisorChatStatisticsModule, IntegrationsModule, QuickResponseModule, CompaniesModule,
-    WidgetModule, ZapiModule, TtsModule, UserStatesModule
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+    }),
+    AuthModule,
+    UsersModule,
+    WorkspacesModule,
+    AgencyModule,
+    TeamsModule,
+    ConfigModule,
+    WhatsappModule,
+    MessengerModule,
+    TelegramModule,
+    TwilioModule,
+    WabaModule,
+    WebchatModule,
+    InstagramModule,
+    PrismaModule,
+    ContactsModule,
+    CompanyModule,
+    LeadsModule,
+    PipelinesModule,
+    TagsModule,
+    NotesModule,
+    CustomFieldsModule,
+    TasksModule,
+    CalModule,
+    AutomationsModule,
+    BroadcastsModule,
+    NotificationsModule,
+    TriggersModule,
+    BillingModule,
+    StatisticsModule,
+    ChatStatisticsModule,
+    EventLogsModule,
+    ReportsModule,
+    GalleryModule,
+    TextToSpeechModule,
+    BaserowModule,
+    WebhooksModule,
+    MarketplaceModule,
+    DomainsModule,
+    SystemFieldsModule,
+    AiModule,
+    DifyModule,
+    AiThemesModule,
+    AiProductsModule,
+    AiFeedersModule,
+    InboxModule,
+    ConversationEventsModule,
+    SupervisorChatStatisticsModule,
+    IntegrationsModule,
+    QuickResponseModule,
+    CompaniesModule,
+    WidgetsModule,
+    IframesModule,
+    ZapiModule,
+    TtsModule,
+    UserStatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

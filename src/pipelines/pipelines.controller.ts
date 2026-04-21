@@ -1,60 +1,95 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+  Param,
+} from '@nestjs/common';
 import { PipelinesService } from './pipelines.service';
 import { JwtAuthGuard } from '../auth/auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pipelines')
 export class PipelinesController {
-    constructor(private readonly service: PipelinesService) { }
+  constructor(private readonly service: PipelinesService) {}
 
-    @Get()
-    async getPipelines(@Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        const userId = BigInt(req.user.sub || 1);
-        return this.service.getPipelines(workspaceId, userId);
-    }
+  @Get()
+  async getPipelines(@Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    const userId = BigInt(req.user.sub || 1);
+    return this.service.getPipelines(workspaceId, userId);
+  }
 
-    @Post()
-    async createPipeline(@Body() body: any, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        const userId = BigInt(req.user.sub || 1);
-        return this.service.createPipeline(workspaceId, userId, body);
-    }
+  @Post()
+  async createPipeline(@Body() body: any, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    const userId = BigInt(req.user.sub || 1);
+    return this.service.createPipeline(workspaceId, userId, body);
+  }
 
-    @Get(':id')
-    async getPipelineData(@Param('id') id: string, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.getPipelineData(workspaceId, BigInt(id));
-    }
+  @Get(':id')
+  async getPipelineData(@Param('id') id: string, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.getPipelineData(workspaceId, BigInt(id));
+  }
 
-    @Get('steps/:stepId/opportunities')
-    async getStepOpportunities(@Param('stepId') stepId: string, @Query() query: any, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.getStepOpportunities(workspaceId, BigInt(stepId), query);
-    }
+  @Get('steps/:stepId/opportunities')
+  async getStepOpportunities(
+    @Param('stepId') stepId: string,
+    @Query() query: any,
+    @Request() req: any,
+  ) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.getStepOpportunities(
+      workspaceId,
+      BigInt(stepId),
+      query,
+    );
+  }
 
-    @Post('opportunities')
-    async createOpportunity(@Body() body: any, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        const userId = BigInt(req.user.sub || 1);
-        return this.service.createOpportunity(workspaceId, userId, body);
-    }
+  @Post('opportunities')
+  async createOpportunity(@Body() body: any, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    const userId = BigInt(req.user.sub || 1);
+    return this.service.createOpportunity(workspaceId, userId, body);
+  }
 
-    @Patch('opportunities/:id/status')
-    async updateOpportunityStatus(@Param('id') id: string, @Body('status') status: string, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.updateOpportunityStatus(workspaceId, BigInt(id), status);
-    }
+  @Patch('opportunities/:id/status')
+  async updateOpportunityStatus(
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Request() req: any,
+  ) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.updateOpportunityStatus(
+      workspaceId,
+      BigInt(id),
+      status,
+    );
+  }
 
-    @Get('steps/:stepId/stats')
-    async getStepStats(@Param('stepId') stepId: string, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.getStepStats(workspaceId, BigInt(stepId));
-    }
+  @Get('steps/:stepId/stats')
+  async getStepStats(@Param('stepId') stepId: string, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.getStepStats(workspaceId, BigInt(stepId));
+  }
 
-    @Post('steps/:stepId/sort')
-    async sortOpportunities(@Param('stepId') stepId: string, @Body('sorted_ids') sortedIds: string[], @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.sortOpportunities(workspaceId, BigInt(stepId), sortedIds);
-    }
+  @Post('steps/:stepId/sort')
+  async sortOpportunities(
+    @Param('stepId') stepId: string,
+    @Body('sorted_ids') sortedIds: string[],
+    @Request() req: any,
+  ) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.sortOpportunities(
+      workspaceId,
+      BigInt(stepId),
+      sortedIds,
+    );
+  }
 }

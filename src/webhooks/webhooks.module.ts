@@ -10,4 +10,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [WebhooksService],
   exports: [WebhooksService],
 })
-export class WebhooksModule { }
+export class WebhooksModule {}

@@ -4,9 +4,9 @@ import { BundlesService } from './bundles.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [BundlesController],
-    providers: [BundlesService],
-    exports: [BundlesService],
+  imports: [PrismaModule],
+  controllers: [BundlesController],
+  providers: [BundlesService],
+  exports: [BundlesService],
 })
-export class BundlesModule { }
+export class BundlesModule {}

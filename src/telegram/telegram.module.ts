@@ -9,4 +9,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [TelegramService],
   exports: [TelegramService],
 })
-export class TelegramModule { }
+export class TelegramModule {}

@@ -9,4 +9,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [SystemFieldsService],
   exports: [SystemFieldsService],
 })
-export class SystemFieldsModule { }
+export class SystemFieldsModule {}

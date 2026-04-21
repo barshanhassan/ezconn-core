@@ -4,6 +4,6 @@ import { TextToSpeechService } from './text-to-speech.service';
 
 @Module({
   controllers: [TextToSpeechController],
-  providers: [TextToSpeechService]
+  providers: [TextToSpeechService],
 })
 export class TextToSpeechModule {}

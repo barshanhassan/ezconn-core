@@ -8,6 +8,6 @@ import { PrismaModule } from '../prisma/prisma.module';
   imports: [PrismaModule],
   controllers: [TeamsController],
   providers: [TeamsService],
-  exports: [TeamsService]
+  exports: [TeamsService],
 })
-export class TeamsModule { }
+export class TeamsModule {}

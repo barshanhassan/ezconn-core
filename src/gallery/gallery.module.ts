@@ -8,6 +8,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 @Module({
   imports: [HttpModule, PrismaModule],
   controllers: [GalleryController],
-  providers: [GalleryService]
+  providers: [GalleryService],
 })
-export class GalleryModule { }
+export class GalleryModule {}

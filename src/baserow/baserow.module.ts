@@ -9,4 +9,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [BaserowService],
   exports: [BaserowService],
 })
-export class BaserowModule { }
+export class BaserowModule {}

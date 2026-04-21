@@ -4,9 +4,9 @@ import { QuickResponseService } from './quick-response.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [QuickResponseController],
-    providers: [QuickResponseService],
-    exports: [QuickResponseService],
+  imports: [PrismaModule],
+  controllers: [QuickResponseController],
+  providers: [QuickResponseService],
+  exports: [QuickResponseService],
 })
-export class QuickResponseModule { }
+export class QuickResponseModule {}

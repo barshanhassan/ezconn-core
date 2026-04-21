@@ -5,8 +5,8 @@ import { HttpModule } from '@nestjs/axios';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule, HttpModule],
-    controllers: [ZapiController],
-    providers: [ZapiService],
+  imports: [PrismaModule, HttpModule],
+  controllers: [ZapiController],
+  providers: [ZapiService],
 })
-export class ZapiModule { }
+export class ZapiModule {}

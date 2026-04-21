@@ -19,7 +19,9 @@ import { PrismaModule } from '../prisma/prisma.module';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: configService.get<string>('jwt.signOptions.expiresIn') as any,
+          expiresIn: configService.get<string>(
+            'jwt.signOptions.expiresIn',
+          ) as any,
         },
       }),
     }),
@@ -28,4 +30,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [AuthService, JwtStrategy],
   exports: [JwtStrategy, PassportModule],
 })
-export class AuthModule { }
+export class AuthModule {}

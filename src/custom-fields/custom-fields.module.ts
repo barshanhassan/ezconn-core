@@ -9,4 +9,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [CustomFieldsService],
   exports: [CustomFieldsService],
 })
-export class CustomFieldsModule { }
+export class CustomFieldsModule {}

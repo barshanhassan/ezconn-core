@@ -3210,6 +3210,9 @@ model team_members {
   created_at                    DateTime? @db.Timestamp(0)
   updated_at                    DateTime? @db.Timestamp(0)
 
+  teams    teams @relation(fields: [team_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "team_members_team_id_foreign")
+  users    users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "team_members_user_id_foreign")
+
   @@index([team_id], map: "idx_team_members_on_team_id")
   @@index([user_id], map: "idx_team_members_on_user_id")
 }
@@ -3225,6 +3228,8 @@ model teams {
   auto_assign  Int                @default(0) @db.TinyInt
   created_at   DateTime?          @db.Timestamp(0)
   updated_at   DateTime?          @db.Timestamp(0)
+
+  team_members team_members[]
 
   @@index([workspace_id], map: "idx_teams_on_workspace_id")
 }
@@ -3670,6 +3675,7 @@ model users {
   updated_at                     DateTime?                        @db.Timestamp(0)
   notification_sound             String                           @default("https://replyagent-staging.s3.amazonaws.com/assets/notification-sounds/notification.wav") @db.VarChar(255)
   pipeline_opportunity_step_logs pipeline_opportunity_step_logs[]
+  team_members                   team_members[]
 
   @@index([email], map: "idx_users_on_email")
   @@index([modelable_id], map: "idx_users_on_modelable_id")

@@ -5,10 +5,10 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('event-logs')
 export class EventLogsController {
-    constructor(private readonly eventLogsService: EventLogsService) { }
+  constructor(private readonly eventLogsService: EventLogsService) {}
 
-    @Get('get')
-    getLogs(@Request() req: any) {
-        return { message: 'Fetching event logs', user: req.user };
-    }
+  @Get('get')
+  getLogs(@Request() req: any) {
+    return { message: 'Fetching event logs', user: req.user };
+  }
 }

@@ -1,29 +1,40 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+  Param,
+} from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { JwtAuthGuard } from '../auth/auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {
-    constructor(private readonly service: TasksService) { }
+  constructor(private readonly service: TasksService) {}
 
-    @Get()
-    async getTasks(@Query() query: any, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.getTasks(workspaceId, query);
-    }
+  @Get()
+  async getTasks(@Query() query: any, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.getTasks(workspaceId, query);
+  }
 
-    @Post()
-    async saveTask(@Body() body: any, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        const userId = BigInt(req.user.sub || 1);
-        const workspaceTimezone = req.user.workspace_timezone || 'UTC';
-        return this.service.saveTask(workspaceId, userId, workspaceTimezone, body);
-    }
+  @Post()
+  async saveTask(@Body() body: any, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    const userId = BigInt(req.user.sub || 1);
+    const workspaceTimezone = req.user.workspace_timezone || 'UTC';
+    return this.service.saveTask(workspaceId, userId, workspaceTimezone, body);
+  }
 
-    @Delete(':id')
-    async deleteTask(@Param('id') id: string, @Request() req: any) {
-        const workspaceId = BigInt(req.user.workspace_id || 1);
-        return this.service.deleteTask(workspaceId, BigInt(id));
-    }
+  @Delete(':id')
+  async deleteTask(@Param('id') id: string, @Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.deleteTask(workspaceId, BigInt(id));
+  }
 }

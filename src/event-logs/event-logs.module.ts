@@ -4,6 +4,6 @@ import { EventLogsService } from './event-logs.service';
 
 @Module({
   controllers: [EventLogsController],
-  providers: [EventLogsService]
+  providers: [EventLogsService],
 })
 export class EventLogsModule {}

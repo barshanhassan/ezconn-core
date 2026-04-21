@@ -5,69 +5,100 @@ import * as dayjs from 'dayjs';
 
 @Injectable()
 export class SupervisorChatStatisticsService {
-    private readonly logger = new Logger(SupervisorChatStatisticsService.name);
+  private readonly logger = new Logger(SupervisorChatStatisticsService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-    /**
-     * Team workload and status overview.
-     */
-    async teamStatus(workspaceId: bigint) {
-        const members = await this.prisma.workspace_members.findMany({
-            where: { workspace_id: workspaceId },
-            include: { users: { select: { id: true, name: true, email: true } } }
-        });
+  /**
+   * Team workload and status overview.
+   */
+  async teamStatus(workspaceId: bigint) {
+    const members = await this.prisma.workspace_members.findMany({
+      where: { workspace_id: workspaceId },
+      include: { users: { select: { id: true, name: true, email: true } } },
+    });
 
-        const stats = [];
-        for (const member of members) {
-            const [open, closed, snoozed] = await Promise.all([
-                this.prisma.inbox.count({ where: { workspace_id: workspaceId, assigned_to: member.user_id, status: 'ACTIVE' } }),
-                this.prisma.inbox.count({ where: { workspace_id: workspaceId, assigned_to: member.user_id, status: 'COMPLETED' } }),
-                this.prisma.inbox.count({ where: { workspace_id: workspaceId, assigned_to: member.user_id, status: 'SNOOZED' } })
-            ]);
+    const stats = [];
+    for (const member of members) {
+      const [open, closed, snoozed] = await Promise.all([
+        this.prisma.inbox.count({
+          where: {
+            workspace_id: workspaceId,
+            assigned_to: member.user_id,
+            status: 'ACTIVE',
+          },
+        }),
+        this.prisma.inbox.count({
+          where: {
+            workspace_id: workspaceId,
+            assigned_to: member.user_id,
+            status: 'COMPLETED',
+          },
+        }),
+        this.prisma.inbox.count({
+          where: {
+            workspace_id: workspaceId,
+            assigned_to: member.user_id,
+            status: 'SNOOZED',
+          },
+        }),
+      ]);
 
-            stats.push({
-                user: member.users,
-                role: member.role,
-                status: member.status,
-                workload: { open, closed, snoozed, total: open + closed + snoozed }
-            });
-        }
-
-        return { team: stats };
+      stats.push({
+        user: member.users,
+        role: member.role,
+        status: member.status,
+        workload: { open, closed, snoozed, total: open + closed + snoozed },
+      });
     }
 
-    /**
-     * Leads (Contacts) distribution per channel.
-     */
-    async getLeadsPerChannelData(workspaceId: bigint, filters: any) {
-        const range = this.resolveDateRange(filters);
-        const contacts = await this.prisma.contacts.groupBy({
-            by: ['source'],
-            where: { workspace_id: workspaceId, created_at: range },
-            _count: true
-        });
+    return { team: stats };
+  }
 
-        return { breakdown: contacts.map(c => ({ channel: c.source || 'unknown', count: c._count })) };
-    }
+  /**
+   * Leads (Contacts) distribution per channel.
+   */
+  async getLeadsPerChannelData(workspaceId: bigint, filters: any) {
+    const range = this.resolveDateRange(filters);
+    const contacts = await this.prisma.contacts.groupBy({
+      by: ['source'],
+      where: { workspace_id: workspaceId, created_at: range },
+      _count: true,
+    });
 
-    /**
-     * Agent productivity charts (Conversations assigned vs resolved).
-     */
-    async getAgentPerformance(workspaceId: bigint, filters: any) {
-        const range = this.resolveDateRange(filters);
-        const performance = await this.prisma.inbox.groupBy({
-            by: ['assigned_to', 'status'],
-            where: { workspace_id: workspaceId, updated_at: range, assigned_to: { not: null } },
-            _count: true
-        });
+    return {
+      breakdown: contacts.map((c) => ({
+        channel: c.source || 'unknown',
+        count: c._count,
+      })),
+    };
+  }
 
-        return { performance };
-    }
+  /**
+   * Agent productivity charts (Conversations assigned vs resolved).
+   */
+  async getAgentPerformance(workspaceId: bigint, filters: any) {
+    const range = this.resolveDateRange(filters);
+    const performance = await this.prisma.inbox.groupBy({
+      by: ['assigned_to', 'status'],
+      where: {
+        workspace_id: workspaceId,
+        updated_at: range,
+        assigned_to: { not: null },
+      },
+      _count: true,
+    });
 
-    private resolveDateRange(filters: any) {
-        const start = filters?.start_date ? dayjs(filters.start_date).startOf('day') : dayjs().subtract(7, 'days').startOf('day');
-        const end = filters?.end_date ? dayjs(filters.end_date).endOf('day') : dayjs().endOf('day');
-        return { gte: start.toDate(), lte: end.toDate() };
-    }
+    return { performance };
+  }
+
+  private resolveDateRange(filters: any) {
+    const start = filters?.start_date
+      ? dayjs(filters.start_date).startOf('day')
+      : dayjs().subtract(7, 'days').startOf('day');
+    const end = filters?.end_date
+      ? dayjs(filters.end_date).endOf('day')
+      : dayjs().endOf('day');
+    return { gte: start.toDate(), lte: end.toDate() };
+  }
 }

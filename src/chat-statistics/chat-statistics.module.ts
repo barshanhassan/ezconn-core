@@ -9,4 +9,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [ChatStatisticsService],
   exports: [ChatStatisticsService],
 })
-export class ChatStatisticsModule { }
+export class ChatStatisticsModule {}

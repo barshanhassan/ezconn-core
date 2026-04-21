@@ -4,6 +4,6 @@ import { AiThemesService } from './ai-themes.service';
 
 @Module({
   controllers: [AiThemesController],
-  providers: [AiThemesService]
+  providers: [AiThemesService],
 })
 export class AiThemesModule {}

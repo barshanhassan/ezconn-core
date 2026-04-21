@@ -4,6 +4,6 @@ import { DifyService } from './dify.service';
 
 @Module({
   controllers: [DifyController],
-  providers: [DifyService]
+  providers: [DifyService],
 })
 export class DifyModule {}

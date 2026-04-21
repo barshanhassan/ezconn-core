@@ -4,9 +4,9 @@ import { ConversationEventsService } from './conversation-events.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [ConversationEventsController],
-    providers: [ConversationEventsService],
-    exports: [ConversationEventsService],
+  imports: [PrismaModule],
+  controllers: [ConversationEventsController],
+  providers: [ConversationEventsService],
+  exports: [ConversationEventsService],
 })
-export class ConversationEventsModule { }
+export class ConversationEventsModule {}

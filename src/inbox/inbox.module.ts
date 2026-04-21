@@ -4,9 +4,9 @@ import { InboxService } from './inbox.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [InboxController],
-    providers: [InboxService],
-    exports: [InboxService],
+  imports: [PrismaModule],
+  controllers: [InboxController],
+  providers: [InboxService],
+  exports: [InboxService],
 })
-export class InboxModule { }
+export class InboxModule {}

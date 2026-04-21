@@ -11,4 +11,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [CalService, BookingService],
   exports: [CalService, BookingService],
 })
-export class CalModule { }
+export class CalModule {}

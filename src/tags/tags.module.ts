@@ -9,4 +9,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   providers: [TagsService],
   exports: [TagsService],
 })
-export class TagsModule { }
+export class TagsModule {}
