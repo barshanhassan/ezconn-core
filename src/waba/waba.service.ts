@@ -15,7 +15,7 @@ export class WabaService {
 
     if (accounts.length === 0) return [];
 
-    const accountIds = accounts.map((a) => a.waba_id);
+    const accountIds = accounts.map((a) => a.id.toString());
 
     // Fetch templates for these accounts
     const templates = await this.prisma.wa_templates.findMany({
@@ -38,7 +38,7 @@ export class WabaService {
 
     const account = await this.prisma.wa_accounts.findFirst({
       where: {
-        waba_id: template.wa_account_id,
+        id: BigInt(template.wa_account_id),
         workspace_id: workspaceId,
       },
     });
@@ -59,5 +59,49 @@ export class WabaService {
     });
 
     return { success: true };
+  }
+
+  async getTemplateStatistics(workspaceId: bigint) {
+    const accounts = await this.prisma.wa_accounts.findMany({
+      where: { workspace_id: workspaceId },
+    });
+
+    if (accounts.length === 0) {
+      return {
+        total: 0,
+        approved: 0,
+        pending: 0,
+        delivered: 0,
+        readRate: '0%',
+        cost: '$0.00'
+      };
+    }
+
+    const accountIds = accounts.map((a) => a.id.toString());
+
+    const [total, approved, pending] = await Promise.all([
+      this.prisma.wa_templates.count({
+        where: { wa_account_id: { in: accountIds } }
+      }),
+      this.prisma.wa_templates.count({
+        where: { wa_account_id: { in: accountIds }, status: 'APPROVED' }
+      }),
+      this.prisma.wa_templates.count({
+        where: { wa_account_id: { in: accountIds }, status: 'PENDING' }
+      })
+    ]);
+
+    // For delivered, readRate, and cost, we might need a different table like wa_messages or wa_logs
+    // For now, I'll return some realistic counts from the templates themselves if available, 
+    // or keep them as placeholders if the schema doesn't support them yet.
+    
+    return {
+      total,
+      approved,
+      pending,
+      delivered: 0, // TODO: Implement when messaging stats are available
+      readRate: '0%',
+      cost: '$0.00'
+    };
   }
 }

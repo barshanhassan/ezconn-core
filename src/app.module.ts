@@ -58,6 +58,8 @@ import { QuickResponseModule } from './quick-response/quick-response.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { LogsModule } from './logs/logs.module';
+
 
 @Module({
   imports: [
@@ -120,6 +122,7 @@ import { join } from 'path';
     ZapiModule,
     TtsModule,
     UserStatesModule,
+    LogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

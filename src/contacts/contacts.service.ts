@@ -43,16 +43,29 @@ export class ContactsService {
 
     const contacts = await this.prisma.contacts.findMany({
       where,
-      include: {
-        tag_links: { include: { tags: true } },
-        company: true,
-        gallery_media: true,
-      },
       orderBy: { id: 'desc' },
       take: 50, // Default pagination limit for now
     });
 
-    return { success: true, contacts };
+    // Fetch tags manually to avoid Prisma relation errors
+    const contactIds = contacts.map(c => c.id);
+    const tagLinks = contactIds.length > 0 ? await this.prisma.tag_links.findMany({
+      where: {
+        linkable_type: 'App\\Models\\Contact',
+        linkable_id: { in: contactIds }
+      }
+    }) : [];
+
+    // Attach tag_links to contacts in the format the frontend expects
+    const contactsWithTags = contacts.map(contact => {
+      const contactTags = tagLinks.filter(tl => tl.linkable_id === contact.id);
+      return {
+        ...contact,
+        tag_links: contactTags.map(tl => ({ tags: { name: tl.name } }))
+      };
+    });
+
+    return { success: true, contacts: contactsWithTags };
   }
 
   /**
@@ -60,21 +73,75 @@ export class ContactsService {
    */
   async getContact(workspaceId: bigint, contactId: bigint) {
     const contact = await this.prisma.contacts.findFirst({
-      where: { id: contactId, workspace_id: workspaceId, deleted_at: null },
-      include: {
-        tag_links: { include: { tags: true } },
-        custom_field_entities: {
-          include: { custom_fields: true, custom_field_entity_values: true },
-        },
-        notes: true,
-        company: true,
-        gallery_media: true,
-      },
+      where: { id: contactId, workspace_id: workspaceId, deleted_at: null }
     });
 
     if (!contact) throw new NotFoundException('Contact not found');
 
-    return { success: true, contact };
+    const tagLinks = await this.prisma.tag_links.findMany({
+      where: {
+        linkable_type: 'App\\Models\\Contact',
+        linkable_id: contact.id
+      }
+    });
+
+    const contactWithTags = {
+      ...contact,
+      tag_links: tagLinks.map(tl => ({ tags: { name: tl.name } }))
+    };
+
+    return { success: true, contact: contactWithTags };
+  }
+
+  /**
+   * Helper to sync tags for a contact
+   */
+  private async syncTags(workspaceId: bigint, contactId: bigint, tagNames: string[]) {
+    // 1. Remove existing tag links for this contact
+    await this.prisma.tag_links.deleteMany({
+      where: {
+        linkable_type: 'App\\Models\\Contact',
+        linkable_id: contactId
+      }
+    });
+
+    if (!tagNames || tagNames.length === 0) return;
+
+    // 2. Find or create tags by name
+    for (const tagName of tagNames) {
+      let tag = await this.prisma.tags.findFirst({
+        where: { workspace_id: workspaceId, name: tagName }
+      });
+      
+      if (!tag) {
+        // Find an admin user to assign as creator, or use a default
+        const adminUser = await this.prisma.users.findFirst({
+          where: { workspace_id: workspaceId }
+        });
+        tag = await this.prisma.tags.create({
+          data: {
+            workspace_id: workspaceId,
+            user_id: adminUser ? adminUser.id : BigInt(1),
+            taggable_type: 'App\\Models\\Workspace',
+            taggable_id: workspaceId,
+            name: tagName,
+            display_inbox: 0,
+            bg_color: '#d3c78d',
+            text_color: '#c04d30'
+          }
+        });
+      }
+
+      // 3. Create tag link
+      await this.prisma.tag_links.create({
+        data: {
+          linkable_type: 'App\\Models\\Contact',
+          linkable_id: contactId,
+          tag_id: tag.id,
+          name: tag.name
+        }
+      });
+    }
   }
 
   /**
@@ -89,6 +156,7 @@ export class ContactsService {
       language,
       timezone,
       company_id,
+      tags
     } = data;
 
     if (!first_name && !last_name && !title) {
@@ -127,39 +195,60 @@ export class ContactsService {
       });
     }
 
-    return { success: true, contact };
+    if (tags && Array.isArray(tags)) {
+      await this.syncTags(workspaceId, contact.id, tags);
+    }
+
+    return await this.getContact(workspaceId, contact.id);
   }
 
   /**
-   * Update specific contact data (System or Custom fields)
+   * Update specific contact data (System or Custom fields, or Bulk edit)
    */
   async updateContactData(workspaceId: bigint, contactId: bigint, data: any) {
-    const { field, field_type } = data;
     const contact = await this.prisma.contacts.findFirst({
       where: { id: contactId, workspace_id: workspaceId },
     });
 
     if (!contact) throw new NotFoundException('Contact not found');
 
-    if (field_type === 'SYSTEM_FIELD') {
-      // Field mapping for system fields
-      const updatePayload = {};
-      updatePayload[field.slug] = field.value;
-      await this.prisma.contacts.update({
-        where: { id: contactId },
-        data: updatePayload,
-      });
-    } else if (field_type === 'CUSTOM_FIELD') {
-      // Custom field logic would involve CustomFieldEntity and values
-      // Currently simplified to mirror Laravel's helper call structure
-      this.logger.log(`Updating custom field for contact ${contactId}`);
-      // Logic for CustomFieldEntity creation/update goes here
+    // Handle field/field_type style update (from contact details page)
+    if (data.field && data.field_type) {
+      const { field, field_type } = data;
+      if (field_type === 'SYSTEM_FIELD') {
+        const updatePayload = {};
+        updatePayload[field.slug] = field.value;
+        await this.prisma.contacts.update({
+          where: { id: contactId },
+          data: updatePayload,
+        });
+      } else if (field_type === 'CUSTOM_FIELD') {
+        this.logger.log(`Updating custom field for contact ${contactId}`);
+      }
+    } 
+    // Handle direct object update (from edit modal or bulk edit)
+    else {
+      const payload: any = {};
+      if (data.first_name !== undefined) payload.first_name = data.first_name;
+      if (data.last_name !== undefined) payload.last_name = data.last_name;
+      if (data.first_name !== undefined || data.last_name !== undefined) {
+         payload.full_name = `${data.first_name || contact.first_name || ''} ${data.last_name || contact.last_name || ''}`.trim();
+      }
+      if (data.title !== undefined) payload.title = data.title;
+      
+      if (Object.keys(payload).length > 0) {
+        await this.prisma.contacts.update({
+          where: { id: contactId },
+          data: payload
+        });
+      }
+
+      if (data.tags && Array.isArray(data.tags)) {
+        await this.syncTags(workspaceId, contactId, data.tags);
+      }
     }
 
-    return {
-      success: true,
-      contact: await this.getContact(workspaceId, contactId),
-    };
+    return await this.getContact(workspaceId, contactId);
   }
 
   /**

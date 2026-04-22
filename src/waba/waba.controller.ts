@@ -24,6 +24,12 @@ export class WabaController {
     return this.service.getTemplates(workspaceId);
   }
 
+  @Get('templates/stats')
+  async getStats(@Request() req: any) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.getTemplateStatistics(workspaceId);
+  }
+
   @Get('templates/:id')
   async getTemplate(@Param('id') id: string, @Request() req: any) {
     const workspaceId = BigInt(req.user.workspace_id || 1);
