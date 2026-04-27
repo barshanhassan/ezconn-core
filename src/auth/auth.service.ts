@@ -17,14 +17,15 @@ export class AuthService {
   ) {}
 
   async login(userDto: any, domainInfo: any) {
-    // Find user by email, modelable_id, and modelable_type (from domain routing)
+    console.log(`Login attempt for email: "${userDto.email}"`);
+
     const user = await this.prisma.users.findFirst({
       where: {
         email: userDto.email,
-        modelable_id: domainInfo.modelable_id,
-        modelable_type: domainInfo.modelable_type,
       },
     });
+    console.log(`User found? ${!!user}`);
+
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -41,6 +42,8 @@ export class AuthService {
       userDto.password,
       user.password || '',
     );
+    console.log(`Password valid? ${isPasswordValid}`);
+
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -100,7 +103,8 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(userDto.password, saltOrRounds);
 
     const agencyName = userDto.agencyName || `${userDto.firstName}'s Agency`;
-    const agencySlug = this.slugify(agencyName);
+    const baseSlug = this.slugify(agencyName);
+    const agencySlug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`;
     const subdomain = userDto.subdomain || agencySlug;
 
     // Transaction for all associated creation

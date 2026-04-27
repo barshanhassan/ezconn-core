@@ -92,4 +92,21 @@ export class PipelinesController {
       sortedIds,
     );
   }
+
+  @Patch('opportunities/:id/move')
+  async moveOpportunity(
+    @Param('id') id: string,
+    @Body('step_id') stepId: string,
+    @Request() req: any,
+  ) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    const userId = BigInt(req.user.sub || 1);
+    return this.service.moveOpportunity(
+      workspaceId,
+      userId,
+      BigInt(id),
+      BigInt(stepId),
+    );
+  }
 }
+

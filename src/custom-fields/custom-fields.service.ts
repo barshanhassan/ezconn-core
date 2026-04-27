@@ -290,4 +290,69 @@ export class CustomFieldsService {
 
     return { success: true };
   }
+
+  // ─── Value Management ──────────────────────────────────────────────
+
+  async getEntityValues(entityType: string, entityId: bigint) {
+    const entities = await this.prisma.custom_field_entities.findMany({
+      where: { entity_type: entityType, entity_id: entityId },
+      include: {
+        custom_fields: true,
+        custom_field_entity_values: true,
+      },
+    });
+
+    return entities.map((e) => ({
+      id: e.custom_field_id,
+      label: e.custom_fields?.label,
+      slug: e.custom_fields?.slug,
+      value: e.custom_field_entity_values[0]?.value,
+    }));
+  }
+
+  async upsertFieldValue(
+    entityType: string,
+    entityId: bigint,
+    fieldId: bigint,
+    value: string,
+  ) {
+    // 1. Ensure entity record exists
+    let entity = await this.prisma.custom_field_entities.findFirst({
+      where: {
+        entity_type: entityType,
+        entity_id: entityId,
+        custom_field_id: fieldId,
+      },
+    });
+
+    if (!entity) {
+      entity = await this.prisma.custom_field_entities.create({
+        data: {
+          entity_type: entityType,
+          entity_id: entityId,
+          custom_field_id: fieldId,
+        },
+      });
+    }
+
+    // 2. Upsert Value
+    const existingValue = await this.prisma.custom_field_entity_values.findFirst({
+      where: { cf_entity_id: entity.id },
+    });
+
+    if (existingValue) {
+      return this.prisma.custom_field_entity_values.update({
+        where: { id: existingValue.id },
+        data: { value: String(value) },
+      });
+    } else {
+      return this.prisma.custom_field_entity_values.create({
+        data: {
+          cf_entity_id: entity.id,
+          value: String(value),
+        },
+      });
+    }
+  }
 }
+

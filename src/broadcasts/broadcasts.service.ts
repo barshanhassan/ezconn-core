@@ -6,12 +6,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AudienceFilterService } from './audience-filter.service';
 
 @Injectable()
 export class BroadcastsService {
   private readonly logger = new Logger(BroadcastsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audienceFilter: AudienceFilterService,
+  ) {}
 
   // ─── Broadcast Campaigns ───────────────────────────────────────────
 
@@ -165,21 +169,18 @@ export class BroadcastsService {
     if (!broadcast) throw new NotFoundException('Broadcast not found');
 
     // Logic for filtering contacts based on broadcast.filters
-    // This usually involves complex dynamic SQL/Query builder in Laravel
-    // Stub: Return total audience count for now
-    const filters = JSON.parse(broadcast.filters || '{}');
-    this.logger.debug(
-      `Fetching audience for broadcast ${broadcastId} with filters: ${JSON.stringify(filters)}`,
-    );
-
-    // Mocking list for now
-    const audienceCount = await this.prisma.contacts.count({
-      where: { workspace_id: workspaceId, deleted_at: null },
+    const contactIds = await this.audienceFilter.getAudienceContactIds(workspaceId, broadcast.filters || '{}');
+    
+    // Fetch limited contact details for the preview
+    const contacts = await this.prisma.contacts.findMany({
+      where: { id: { in: contactIds } },
+      take: 50,
+      orderBy: { id: 'desc' }
     });
 
     return {
-      total: audienceCount,
-      contacts: [], // Logic to paginate filtered contacts goes here
+      total: contactIds.length,
+      contacts: contacts,
     };
   }
 

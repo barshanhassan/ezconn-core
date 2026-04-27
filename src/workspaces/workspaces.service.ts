@@ -137,6 +137,13 @@ export class WorkspacesService {
     if (data.incomingText !== undefined) updateData.incoming_chat_text_color = data.incomingText;
     if (data.outgoingBubble !== undefined) updateData.outgoing_chat_color = data.outgoingBubble;
     if (data.outgoingText !== undefined) updateData.outgoing_chat_text_color = data.outgoingText;
+    
+    // Logo and Favicon IDs
+    if (data.logoLightId !== undefined) updateData.mid_logo_light = BigInt(data.logoLightId);
+    if (data.logoLightSmallId !== undefined) updateData.mid_logo_light_small = BigInt(data.logoLightSmallId);
+    if (data.logoDarkId !== undefined) updateData.mid_logo_dark = BigInt(data.logoDarkId);
+    if (data.logoDarkSmallId !== undefined) updateData.mid_logo_dark_small = BigInt(data.logoDarkSmallId);
+    if (data.faviconId !== undefined) updateData.favicon_media_id = BigInt(data.faviconId);
 
     return this.prisma.brandings.update({
       where: { id: branding.id },

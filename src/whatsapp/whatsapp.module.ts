@@ -1,4 +1,11 @@
 import { Module } from '@nestjs/common';
+import { WhatsappService } from './whatsapp.service';
+import { WhatsappController } from './whatsapp.controller';
+import { PrismaService } from '../prisma/prisma.service';
 
-@Module({})
+@Module({
+  controllers: [WhatsappController],
+  providers: [WhatsappService, PrismaService],
+  exports: [WhatsappService],
+})
 export class WhatsappModule {}

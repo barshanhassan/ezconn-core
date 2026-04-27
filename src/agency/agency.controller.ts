@@ -19,14 +19,22 @@ export class AgencyController {
   constructor(private readonly service: AgencyService) {}
 
   // ─── Agency Profile ────────────────────────────────────────────────
+  
+  @Get(':id')
+  async getAgency(@Param('id') id: string) {
+    return this.service.getAgency(BigInt(id));
+  }
+
 
   @Patch(':id')
-  async updateAgency(@Param('id') id: string, @Body() body: any) {
+  async updateAgency(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    body.user_id = BigInt(req.user.sub);
     return this.service.updateAgency(BigInt(id), body);
   }
 
   @Patch(':id/billing')
-  async updateBillingAddress(@Param('id') id: string, @Body() body: any) {
+  async updateBillingAddress(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    body.user_id = BigInt(req.user.sub);
     return this.service.updateBillingAddress(BigInt(id), body);
   }
 
@@ -35,7 +43,16 @@ export class AgencyController {
     return this.service.updateBranding(BigInt(id), body);
   }
 
-  // ─── Workspace Management ───────────────────────────────────────────
+  @Post(':id/workspaces/checkout')
+  async workspaceCheckout(@Param('id') id: string, @Body() body: any) {
+    return this.service.workspaceCheckout(BigInt(id), body);
+  }
+
+  @Get(':id/workspaces')
+  async getWorkspaces(@Param('id') id: string) {
+    return this.service.getWorkspaces(BigInt(id));
+  }
+
 
   @Post(':id/workspaces')
   async createWorkspace(

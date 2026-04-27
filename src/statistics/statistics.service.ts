@@ -316,6 +316,16 @@ export class StatisticsService {
       outgoing: msgs.find((m) => m.direction === 'OUTGOING')?._count || 0,
     });
 
+    // 3. Broadcasts & Automations (Last 30 Days)
+    const [broadcastsCount, activeAutomations] = await Promise.all([
+      this.prisma.broadcasts.count({
+        where: { workspace_id: workspaceId, created_at: range }
+      }),
+      this.prisma.automations.count({
+        where: { workspace_id: workspaceId, status: 'PUBLISHED' }
+      })
+    ]);
+
     return {
       contacts: {
         by_source: sourceMap,
@@ -328,6 +338,10 @@ export class StatisticsService {
         whatsapp: getCounts(waMsgs),
         instagram: getCounts(instaMsgs),
       },
+      engagement: {
+        broadcasts_sent: broadcastsCount,
+        active_automations: activeAutomations,
+      }
     };
   }
 

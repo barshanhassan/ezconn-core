@@ -140,11 +140,110 @@ export class InboxService {
 
     return {
       inbox: enrichedInboxes,
-
       total,
       page: parseInt(page),
       limit: take,
       pages: Math.ceil(total / take),
+    };
+  }
+
+  /**
+   * Get counts for different inbox statuses (Active, Unread, Snoozed, Completed, Unassigned)
+   */
+  async getInboxCounts(workspaceId: bigint, filters: any) {
+    const now = new Date();
+    const userIds = filters.users ? filters.users.map(id => id === 'NULL' ? null : BigInt(id)) : [];
+    
+    // Base where clause for counts
+    const baseWhere: any = { workspace_id: workspaceId };
+
+    // Function to get count for a specific set of conditions
+    const getCount = async (additionalWhere: any) => {
+      return this.prisma.inbox.count({
+        where: { ...baseWhere, ...additionalWhere }
+      });
+    };
+
+    const counts = {
+      inbox: 0,
+      unread: 0,
+      read: 0,
+      future: 0,
+      completed: 0,
+      unassigned: 0,
+    };
+
+    // User filtering for assigned counts
+    const userFilter = userIds.length > 0 ? { user_id: { in: userIds } } : { user_id: { not: null } };
+
+    // 1. Inbox (Active & Assigned)
+    counts.inbox = await getCount({
+      status: 'ACTIVE',
+      ...userFilter,
+      OR: [
+        { snooze: null },
+        { snooze: { lte: now } }
+      ]
+    });
+
+    // 2. Unread
+    counts.unread = await getCount({
+      status: 'ACTIVE',
+      is_read: 0,
+      ...userFilter,
+      OR: [
+        { snooze: null },
+        { snooze: { lte: now } }
+      ]
+    });
+
+    // 3. Read
+    counts.read = await getCount({
+      status: 'ACTIVE',
+      is_read: 1,
+      ...userFilter,
+      OR: [
+        { snooze: null },
+        { snooze: { lte: now } }
+      ]
+    });
+
+    // 4. Future (Snoozed)
+    counts.future = await getCount({
+      status: 'ACTIVE',
+      ...userFilter,
+      snooze: { gt: now }
+    });
+
+    // 5. Completed
+    counts.completed = await getCount({
+      status: 'COMPLETED',
+      ...userFilter
+    });
+
+    // 6. Unassigned
+    counts.unassigned = await getCount({
+      status: 'UNASSIGNED',
+      user_id: null
+    });
+
+    // Folder counts
+    const folderCounts = await this.prisma.inbox.groupBy({
+      by: ['folder_id'],
+      where: {
+        workspace_id: workspaceId,
+        folder_id: { not: null },
+        status: { not: 'DELETED' }
+      },
+      _count: true
+    });
+
+    return {
+      counts,
+      folder_counts: folderCounts.map(f => ({
+        folder_id: f.folder_id,
+        chat_count: f._count
+      }))
     };
   }
 
@@ -231,7 +330,29 @@ export class InboxService {
       });
     }
 
-    return { messages: messages.reverse(), page: parseInt(page), limit: take };
+    // Enrich with Gallery Media
+    const enrichedMessages = await Promise.all(
+      messages.map(async (msg) => {
+        const item = msg as any;
+        if (msg.gallery_media_id) {
+          try {
+            // Handle both BigInt and potential string IDs
+            const mediaId = typeof msg.gallery_media_id === 'string' 
+              ? BigInt(msg.gallery_media_id.split(',')[0]) // Take first if comma separated
+              : BigInt(msg.gallery_media_id);
+
+            item.gallery_media = await this.prisma.media_gallery.findUnique({
+              where: { id: mediaId }
+            });
+          } catch (e) {
+            this.logger.warn(`Failed to load gallery media for message ${msg.id}: ${e.message}`);
+          }
+        }
+        return item;
+      })
+    );
+
+    return { messages: enrichedMessages.reverse(), page: parseInt(page), limit: take };
   }
 
   /**
@@ -440,6 +561,13 @@ export class InboxService {
     return this.prisma.inbox.updateMany({
       where: { id: { in: inboxIds }, workspace_id: workspaceId },
       data: { assigned_to: assignedTo },
+    });
+  }
+
+  async snoozeConversation(inboxId: bigint, until: Date, workspaceId: bigint) {
+    return this.prisma.inbox.update({
+      where: { id: inboxId, workspace_id: workspaceId },
+      data: { snooze: until, status: 'ACTIVE' },
     });
   }
 

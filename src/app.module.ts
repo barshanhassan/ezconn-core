@@ -6,7 +6,6 @@ import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { AgencyModule } from './agency/agency.module';
 import { TeamsModule } from './teams/teams.module';
-import { ConfigModule } from './config/config.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { MessengerModule } from './messenger/messenger.module';
 import { TelegramModule } from './telegram/telegram.module';
@@ -57,22 +56,28 @@ import { SupervisorChatStatisticsModule } from './supervisor-chat-statistics/sup
 import { QuickResponseModule } from './quick-response/quick-response.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { join } from 'path';
-import { LogsModule } from './logs/logs.module';
-
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     WorkspacesModule,
     AgencyModule,
     TeamsModule,
-    ConfigModule,
     WhatsappModule,
     MessengerModule,
     TelegramModule,
@@ -122,7 +127,6 @@ import { LogsModule } from './logs/logs.module';
     ZapiModule,
     TtsModule,
     UserStatesModule,
-    LogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

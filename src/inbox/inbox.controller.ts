@@ -18,21 +18,31 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 export class InboxController {
   constructor(private readonly service: InboxService) {}
 
-  @Get('get-inbox-list')
-  async getInboxList(@Query() query: any, @Request() req: any) {
+  @Post('list')
+  async getInboxList(@Body() body: any, @Request() req: any) {
     const workspaceId = BigInt(req.user.workspace_id || 1);
-    return this.service.getInboxList(workspaceId, query);
+    const filters = body || {};
+    
+    if (filters.mode === 'COUNT') {
+      return this.service.getInboxCounts(workspaceId, filters);
+    }
+    
+    return this.service.getInboxList(workspaceId, filters);
   }
 
-  @Get('get-inbox-item/:id')
+  @Get('item/:id')
   async getInboxItem(@Param('id') id: string, @Request() req: any) {
     const workspaceId = BigInt(req.user.workspace_id || 1);
     return this.service.getInboxItem(BigInt(id), workspaceId);
   }
 
-  @Get('get-chat-messages/:id')
-  async getChatMessages(@Param('id') id: string, @Query() query: any) {
-    return this.service.getChatMessages(BigInt(id), query);
+  @Post('messages/:id')
+  async getChatMessages(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.service.getChatMessages(BigInt(id), body);
   }
 
   @Get('get-profile-data/:id')
@@ -60,11 +70,36 @@ export class InboxController {
     );
   }
 
-  @Post('assign-conversation')
-  async assignConversation(@Body() body: any, @Request() req: any) {
+  @Patch('snooze/:id')
+  async snoozeConversation(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
     const workspaceId = BigInt(req.user.workspace_id || 1);
-    const userId = BigInt(req.user.sub || 1);
-    return this.service.assignConversation(body, workspaceId, userId);
+    const until = new Date(body.until);
+    return this.service.snoozeConversation(BigInt(id), until, workspaceId);
+  }
+
+  @Patch('assign/:id')
+  async assignConversation(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    const userId = BigInt(req.user.id || req.user.sub || 1);
+    return this.service.assignConversation({ ...body, inbox_id: id }, workspaceId, userId);
+  }
+
+  @Patch('status/:id')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    const workspaceId = BigInt(req.user.workspace_id || 1);
+    return this.service.updateInboxStatus(BigInt(id), body.status, workspaceId);
   }
 
   @Post('assign-conversation-bulk')

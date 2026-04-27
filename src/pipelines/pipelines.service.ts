@@ -6,12 +6,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class PipelinesService {
   private readonly logger = new Logger(PipelinesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   /**
    * Get assigned pipelines for a workspace
@@ -161,7 +165,63 @@ export class PipelinesService {
       },
     });
 
-    return { success: true, opportunity };
+    // Log step change
+    await this.prisma.pipeline_opportunity_step_logs.create({
+      data: {
+        pl_opportunity_id: opportunity.id,
+        pl_step_id: BigInt(pl_step_id),
+        user_id: userId,
+        workspace_id: workspaceId,
+      },
+    });
+
+    return { success: true, opportunity: this.serialize(opportunity) };
+  }
+
+  /**
+   * Move opportunity to a new step
+   */
+  async moveOpportunity(workspaceId: bigint, userId: bigint, opportunityId: bigint, stepId: bigint) {
+    const opportunity = await this.prisma.pipeline_opportunities.findUnique({
+      where: { id: opportunityId, workspace_id: workspaceId }
+    });
+
+    if (!opportunity) throw new NotFoundException('Opportunity not found');
+
+    const updated = await this.prisma.pipeline_opportunities.update({
+      where: { id: opportunityId },
+      data: { pl_step_id: stepId, status_changed_at: new Date() }
+    });
+
+    // Log step change
+    await this.prisma.pipeline_opportunity_step_logs.create({
+      data: {
+        pl_opportunity_id: opportunityId,
+        pl_step_id: stepId,
+        user_id: userId,
+        workspace_id: workspaceId,
+      },
+    });
+
+    // Emit event for automation
+    if (updated.contact_id) {
+      this.eventEmitter.emit('opportunity.stage_moved', {
+        contactId: updated.contact_id,
+        pipelineId: updated.pl_id,
+        stageId: stepId,
+        workspaceId,
+      });
+    }
+
+    return { success: true, opportunity: this.serialize(updated) };
+  }
+
+  private serialize(obj: any) {
+    return JSON.parse(
+      JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      ),
+    );
   }
 
   /**

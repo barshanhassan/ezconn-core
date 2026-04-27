@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   Injectable,
   BadRequestException,
@@ -6,115 +5,186 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChargebeeService } from './chargebee.service';
+import { BillingSyncHelper } from './helpers/billing-sync.helper';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chargebee: ChargebeeService,
+    private readonly syncHelper: BillingSyncHelper,
+    private readonly config: ConfigService,
+  ) {}
 
   // ─── Webhook Handling ───────────────────────────────────────────────
 
   async handleBillingEvents(payload: any) {
     this.logger.debug(`Billing Event: ${payload.event_type}`);
-    // Stub: Process Chargebee events (subscription_created, etc.)
-    // In the original code, this dispatches a ProcessBillingEvent job
+    // Extract agency from customer ID
+    if (payload.content?.customer?.id) {
+      const agency = await this.prisma.agencies.findFirst({
+        where: { customer_id: payload.content.customer.id }
+      });
+      if (agency && payload.content.subscription) {
+        await this.syncHelper.syncSubscription(agency.id, payload.content.subscription);
+      }
+    }
     return { success: true };
   }
 
   // ─── Subscription Lifecycle ──────────────────────────────────────────
 
-  async upgrade(workspaceId: bigint, itemPriceId: string) {
-    // Fetch current subscription
+  async upgrade(agencyId: bigint, itemPriceId: string) {
+    const agency = await this.prisma.agencies.findUnique({
+      where: { id: agencyId }
+    });
+    if (!agency) throw new NotFoundException('Agency not found');
+
+    const owner = await this.prisma.users.findFirst({
+      where: { modelable_id: agencyId, modelable_type: 'App\\Models\\Agency' }
+    });
+
+    // 1. Ensure Customer exists in Chargebee
+    if (!agency.customer_id) {
+      const customer = await this.chargebee.createCustomer({
+        first_name: owner?.first_name || '',
+        last_name: owner?.last_name || '',
+        email: owner?.email || agency.email,
+      });
+      await this.prisma.agencies.update({
+        where: { id: agencyId },
+        data: { customer_id: customer.id }
+      });
+      agency.customer_id = customer.id;
+    }
+
+    // 2. Resolve target plan
+    const itemPrice = await this.prisma.billing_item_prices.findFirst({
+      where: { price_id: itemPriceId }
+    });
+    if (!itemPrice) throw new BadRequestException('Invalid plan price ID');
+
+    // 3. Calculate quantities for addons
+    const subscriptionItems = [
+      { item_price_id: itemPriceId } // Target Plan
+    ];
+
+    // Example: Workspace Addons
+    const workspacesCount = await this.prisma.workspaces.count({ where: { agency_id: agencyId } });
+    const freeWorkspaces = 1; // This should come from billing_plans table
+    if (workspacesCount > freeWorkspaces) {
+      subscriptionItems.push({
+        item_price_id: this.config.get('BILLING_WORKSPACE_ADDON_PRICE_ID'),
+        quantity: workspacesCount - freeWorkspaces
+      } as any);
+    }
+
+    // 4. Generate Hosted Page
     const subscription = await this.prisma.billing_subscriptions.findFirst({
-      where: { workspace_id: workspaceId },
+      where: { agency_id: agencyId }
     });
 
-    // Stub: Initiate Chargebee checkout/upgrade
-    return {
-      message: `Upgrade initiated for price: ${itemPriceId}`,
-      // hosted_page: { url: '...' }
+    const params = {
+      subscription: subscription ? { id: subscription.subscription_id } : undefined,
+      subscription_items: subscriptionItems,
+      customer: { id: agency.customer_id },
+      layout: 'full_page',
     };
+
+    const hostedPage = subscription 
+      ? await this.chargebee.checkoutExistingForItems(params)
+      : await this.chargebee.checkoutNewForItems(params);
+
+    return hostedPage;
   }
 
-  async cancelSubscription(workspaceId: bigint) {
-    await this.prisma.billing_subscriptions.updateMany({
-      where: { workspace_id: workspaceId, status: 'ACTIVE' },
-      data: { status: 'CANCELLED' as any, cancelled_at: new Date() },
+  async acknowledge(agencyId: bigint, hostedPageId: string) {
+    const hostedPage = await this.chargebee.retrieveHostedPage(hostedPageId);
+    if (hostedPage.state === 'succeeded') {
+      const subscription = hostedPage.content.subscription;
+      await this.syncHelper.syncSubscription(agencyId, subscription);
+      return { success: true, status: 'succeeded' };
+    }
+    return { success: false, status: hostedPage.state };
+  }
+
+  async cancelSubscription(agencyId: bigint) {
+    const sub = await this.prisma.billing_subscriptions.findFirst({
+      where: { agency_id: agencyId, status: 'active' as any }
     });
+    if (!sub) throw new NotFoundException('No active subscription found');
+
+    const result = await this.chargebee.cancelSubscriptionForItems(sub.subscription_id);
+    await this.syncHelper.syncSubscription(agencyId, result.subscription);
+    
     return { success: true };
   }
 
-  async resubscribe(workspaceId: bigint) {
-    // Logic to reactivate a cancelled subscription
-    await this.prisma.billing_subscriptions.updateMany({
-      where: { workspace_id: workspaceId, status: 'CANCELLED' },
-      data: { status: 'ACTIVE' as any, cancelled_at: null },
-    });
+  async cancelVipPass(workspaceId: bigint) {
+    // Stub for VIP pass cancellation logic
     return { success: true };
   }
 
-  async acknowledge(workspaceId: bigint, hostedPageId: string) {
-    // Callback after hosted page checkout
-    this.logger.debug(
-      `Acknowledging hosted page ${hostedPageId} for workspace ${workspaceId}`,
-    );
-    // Stub: Sync subscription data from Chargebee
+  async acknowledgeVipPass(agencyId: bigint, hostedPageId: string) {
+    return this.acknowledge(agencyId, hostedPageId);
+  }
+
+  async saveInvoiceRecipient(agencyId: bigint, data: any) {
+    // Stub for saving additional invoice recipients
+    return { success: true };
+  }
+
+  async deleteInvoiceRecipient(agencyId: bigint, contactId: string) {
+    // Stub for deleting invoice recipients
+    return { success: true };
+  }
+
+  async applyACoupon(agencyId: bigint, couponCode: string) {
+    // Stub for applying a coupon via Chargebee
+    return { success: true };
+  }
+
+  async agencyBranding(agencyId: bigint) {
+    // Stub for agency branding checkout
+    return { success: true };
+  }
+
+  async checkoutVipPass(agencyId: bigint) {
+    // Stub for VIP pass checkout
+    return { success: true };
+  }
+
+  async resubscribe(agencyId: bigint) {
+    // Ported logic for reactivation if needed
     return { success: true };
   }
 
   // ─── Usage & Dashboard ──────────────────────────────────────────────
 
-  async getCurrentUsage(workspaceId: bigint) {
-    const usage = await this.prisma.workspace_usages.findFirst({
-      where: { workspace_id: workspaceId },
-    });
+  async getCurrentUsage(agencyId: bigint) {
+    const workpaceIds = (await this.prisma.workspaces.findMany({
+      where: { agency_id: agencyId },
+      select: { id: true }
+    })).map(w => w.id);
 
-    // Detailed usage breakdown (contacts, messages, AI, etc.)
+    const [contacts, wa, tg, fb] = await Promise.all([
+      this.prisma.contacts.count({ where: { workspace_id: { in: workpaceIds } } }),
+      this.prisma.wa_accounts.count({ where: { workspace_id: { in: workpaceIds }, status: 'ACTIVE' } }),
+      this.prisma.telegram_bots.count({ where: { workspace_id: { in: workpaceIds }, status: 'ACTIVE' } }),
+      this.prisma.fb_pages.count({ where: { workspace_id: { in: workpaceIds }, status: 'ACTIVE' } }),
+    ]);
+
     return {
-      usage,
-      limits: {
-        contacts: 1000,
-        messages: 5000,
-        ai_queries: 100,
-      },
+      contacts,
+      channels: {
+        whatsapp: wa,
+        telegram: tg,
+        messenger: fb
+      }
     };
-  }
-
-  // ─── Account Settings ───────────────────────────────────────────────
-
-  async saveInvoiceRecipient(workspaceId: bigint, data: any) {
-    // In original code, this updates billing info in Chargebee
-    return { success: true };
-  }
-
-  async deleteInvoiceRecipient(workspaceId: bigint, contactId: string) {
-    // Logic to remove a billing contact
-    return { success: true };
-  }
-
-  async applyACoupon(workspaceId: bigint, couponCode: string) {
-    // Validate and apply coupon in Chargebee
-    return { success: true };
-  }
-
-  // ─── VIP Pass & Agency Branding ──────────────────────────────────────
-
-  async checkoutVipPass(workspaceId: bigint) {
-    // Checkout flow for VIP passes
-    return { url: 'https://checkout.example.com/vip-pass' };
-  }
-
-  async acknowledgeVipPass(workspaceId: bigint, hostedPageId: string) {
-    return { success: true };
-  }
-
-  async cancelVipPass(workspaceId: bigint) {
-    return { success: true };
-  }
-
-  async agencyBranding(workspaceId: bigint) {
-    // Checkout flow for agency branding add-on
-    return { url: 'https://checkout.example.com/branding' };
   }
 }

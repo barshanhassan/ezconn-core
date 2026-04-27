@@ -6,12 +6,18 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CustomFieldsService } from '../custom-fields/custom-fields.service';
 
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly customFieldsService: CustomFieldsService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   /**
    * Get contacts with workspace scoping and basic filters
@@ -78,19 +84,48 @@ export class ContactsService {
 
     if (!contact) throw new NotFoundException('Contact not found');
 
-    const tagLinks = await this.prisma.tag_links.findMany({
-      where: {
-        linkable_type: 'App\\Models\\Contact',
-        linkable_id: contact.id
-      }
-    });
+    const customFields = await this.customFieldsService.getEntityValues('Contact', contact.id);
 
     const contactWithTags = {
-      ...contact,
-      tag_links: tagLinks.map(tl => ({ tags: { name: tl.name } }))
+      ...this.serialize(contact),
+      tag_links: tagLinks.map(tl => ({ tags: { name: tl.name } })),
+      custom_fields: customFields,
     };
 
     return { success: true, contact: contactWithTags };
+  }
+
+  /**
+   * Check if contact already exists by email or phone in workspace
+   */
+  async findExistingContact(workspaceId: bigint, email?: string, phone?: string) {
+    if (email) {
+      const emailRecord = await this.prisma.contact_emails.findFirst({
+        where: { email, modelable_type: 'App\\Models\\Contact' },
+        include: { contacts: true } // Assuming relation exists
+      });
+      // Since relations might be missing, we query contacts table manually
+      if (emailRecord) {
+        const contact = await this.prisma.contacts.findFirst({
+          where: { id: emailRecord.modelable_id, workspace_id: workspaceId, deleted_at: null }
+        });
+        if (contact) return contact;
+      }
+    }
+
+    if (phone) {
+      const mobileRecord = await this.prisma.contact_mobiles.findFirst({
+        where: { full_mobile_number: phone, modelable_type: 'App\\Models\\Contact' }
+      });
+      if (mobileRecord) {
+        const contact = await this.prisma.contacts.findFirst({
+          where: { id: mobileRecord.modelable_id, workspace_id: workspaceId, deleted_at: null }
+        });
+        if (contact) return contact;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -141,6 +176,13 @@ export class ContactsService {
           name: tag.name
         }
       });
+
+      // Emit event for automation
+      this.eventEmitter.emit('contact.tag_applied', {
+        contactId,
+        tagId: tag.id,
+        workspaceId
+      });
     }
   }
 
@@ -185,6 +227,10 @@ export class ContactsService {
         data: payload,
       });
     } else {
+      // Identity Check
+      const existing = await this.findExistingContact(workspaceId, data.email, data.phone);
+      if (existing) return await this.getContact(workspaceId, existing.id);
+
       contact = await this.prisma.contacts.create({
         data: {
           ...payload,
@@ -193,10 +239,49 @@ export class ContactsService {
           status: 'PENDING',
         },
       });
+
+      // Save Email/Mobile
+      if (data.email) {
+        await this.prisma.contact_emails.create({
+          data: {
+            ownership_id: workspaceId,
+            ownership_type: 'App\\Models\\Workspace',
+            modelable_id: contact.id,
+            modelable_type: 'App\\Models\\Contact',
+            email: data.email,
+            is_primary: 1
+          }
+        });
+      }
+      if (data.phone) {
+        await this.prisma.contact_mobiles.create({
+          data: {
+            ownership_id: workspaceId,
+            ownership_type: 'App\\Models\\Workspace',
+            modelable_id: contact.id,
+            modelable_type: 'App\\Models\\Contact',
+            full_mobile_number: data.phone,
+            country_id: BigInt(data.country_id || 1),
+            is_primary: 1
+          }
+        });
+      }
     }
 
     if (tags && Array.isArray(tags)) {
       await this.syncTags(workspaceId, contact.id, tags);
+    }
+
+    // Handle Custom Fields in data
+    if (data.custom_fields && typeof data.custom_fields === 'object') {
+      for (const [slug, value] of Object.entries(data.custom_fields)) {
+        const field = await this.prisma.custom_fields.findFirst({
+          where: { workspace_id: workspaceId, slug: slug }
+        });
+        if (field) {
+          await this.customFieldsService.upsertFieldValue('Contact', contact.id, field.id, String(value));
+        }
+      }
     }
 
     return await this.getContact(workspaceId, contact.id);
@@ -223,7 +308,12 @@ export class ContactsService {
           data: updatePayload,
         });
       } else if (field_type === 'CUSTOM_FIELD') {
-        this.logger.log(`Updating custom field for contact ${contactId}`);
+        const cf = await this.prisma.custom_fields.findFirst({
+          where: { workspace_id: workspaceId, slug: field.slug }
+        });
+        if (cf) {
+          await this.customFieldsService.upsertFieldValue('Contact', contactId, cf.id, String(field.value));
+        }
       }
     } 
     // Handle direct object update (from edit modal or bulk edit)
@@ -246,9 +336,28 @@ export class ContactsService {
       if (data.tags && Array.isArray(data.tags)) {
         await this.syncTags(workspaceId, contactId, data.tags);
       }
+
+      if (data.custom_fields && typeof data.custom_fields === 'object') {
+        for (const [slug, value] of Object.entries(data.custom_fields)) {
+          const cf = await this.prisma.custom_fields.findFirst({
+            where: { workspace_id: workspaceId, slug: slug }
+          });
+          if (cf) {
+            await this.customFieldsService.upsertFieldValue('Contact', contactId, cf.id, String(value));
+          }
+        }
+      }
     }
 
     return await this.getContact(workspaceId, contactId);
+  }
+
+  private serialize(obj: any) {
+    return JSON.parse(
+      JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      ),
+    );
   }
 
   /**
